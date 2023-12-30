@@ -130,3 +130,20 @@ class IG_Folder:
         parent = folder_paths.input_directory if folder_parent == "folder_parent" else folder_paths.output_directory
         directory = os.path.join(parent, folder_name)
         return (directory,)
+    
+class IG_PathJoin:
+    @classmethod
+    def INPUT_TYPES(cls):
+        return {
+            "required": {
+                "first": ("STRING", {"default": '', "multiline": False}),
+                "second": ("STRING", {"default": '', "multiline": False}),
+            },
+        }
+    
+    RETURN_TYPES = ("STRING",)
+    FUNCTION = "main"
+    CATEGORY = TREE_IO
+    def main(self, first, second):
+        path = os.path.join(first, second)
+        return (path,)
