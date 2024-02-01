@@ -14,7 +14,8 @@ from .nodes.primitives import *
 NODE_CLASS_MAPPINGS = {
     "IG Multiply":          IG_MultiplyNode,   
     "IG Explorer":          IG_ExplorerNode,
-    "IG Folder":            IG_Folder,       
+    "IG Folder":            IG_Folder,      
+    "IG Load Image":        IG_LoadImage, 
     "IG Load Images":       IG_LoadImagesFromFolder,
     "IG Analyze SSIM":      IG_AnalyzeSSIM,
     "IG Int":               IG_Int,
@@ -27,6 +28,7 @@ NODE_DISPLAY_NAME_MAPPINGS = {
     "IG Multiply":          "🧮 IG Multiply",
     "IG Explorer":          "🤖 IG Explorer",
     "IG Folder":            "📂 IG Folder",
+    "IG Load Image":       "📂 IG Load Image",
     "IG Load Images":       "📂 IG Load Images",
     "IG Analyze SSIM":      "📉 Analyze SSIM",
     "IG Int":               "➡️ IG Int",
