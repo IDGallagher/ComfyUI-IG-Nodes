@@ -10,6 +10,7 @@ from .nodes.explorer import *
 from .nodes.io import *
 from .nodes.analyze import *
 from .nodes.primitives import *
+from .nodes.interpolate import *
 
 NODE_CLASS_MAPPINGS = {
     "IG Multiply":          IG_MultiplyNode,   
@@ -21,7 +22,8 @@ NODE_CLASS_MAPPINGS = {
     "IG Int":               IG_Int,
     "IG Float":             IG_Float,
     "IG String":            IG_String,
-    "IG Path Join":         IG_PathJoin
+    "IG Path Join":         IG_PathJoin,
+    "IG Cross Fade Images": IG_CrossFadeImages,
 }
 
 NODE_DISPLAY_NAME_MAPPINGS = {
@@ -34,5 +36,6 @@ NODE_DISPLAY_NAME_MAPPINGS = {
     "IG Int":               "➡️ IG Int",
     "IG Float":             "➡️ IG Float",
     "IG String":            "➡️ IG String",
-    "IG Path Join":         "📂 IG Path Join"
+    "IG Path Join":         "📂 IG Path Join",
+    "IG Cross Fade Images": "🧑🏻‍🧑🏿‍🧒🏽 IG Cross Fade Images",
 }
