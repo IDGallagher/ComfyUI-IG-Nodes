@@ -24,13 +24,14 @@ NODE_CLASS_MAPPINGS = {
     "IG String":            IG_String,
     "IG Path Join":         IG_PathJoin,
     "IG Cross Fade Images": IG_CrossFadeImages,
+    "IG ZFill":             IG_ZFill
 }
 
 NODE_DISPLAY_NAME_MAPPINGS = {
     "IG Multiply":          "🧮 IG Multiply",
     "IG Explorer":          "🤖 IG Explorer",
     "IG Folder":            "📂 IG Folder",
-    "IG Load Image":       "📂 IG Load Image",
+    "IG Load Image":        "📂 IG Load Image",
     "IG Load Images":       "📂 IG Load Images",
     "IG Analyze SSIM":      "📉 Analyze SSIM",
     "IG Int":               "➡️ IG Int",
@@ -38,4 +39,5 @@ NODE_DISPLAY_NAME_MAPPINGS = {
     "IG String":            "➡️ IG String",
     "IG Path Join":         "📂 IG Path Join",
     "IG Cross Fade Images": "🧑🏻‍🧑🏿‍🧒🏽 IG Cross Fade Images",
+    "IG ZFill":             "⌨️IG ZFill",
 }

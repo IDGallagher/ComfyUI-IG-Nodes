@@ -58,3 +58,23 @@ class IG_String:
 
     def main(self, value):
         return (value,)
+    
+class IG_ZFill:
+    def __init__(self) -> None:
+        pass
+
+    @classmethod
+    def INPUT_TYPES(cls):
+        return {
+            "required": {
+                "value": ("INT", {"default": 0, "min": -sys.maxsize, "max": sys.maxsize, "step": 1}),
+                "fill": ("INT", {"default": 6, "min": 0, "max": 8, "step": 1}),
+            },
+        }
+
+    RETURN_TYPES = ("STRING",)
+    FUNCTION = "main"
+    CATEGORY = TREE_PRIMITIVES
+
+    def main(self, value, fill):
+        return (f"{value}".zfill(fill),)
