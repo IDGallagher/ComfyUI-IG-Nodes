@@ -176,7 +176,7 @@ class IG_Folder:
     CATEGORY = TREE_IO
 
     def main(self, folder_parent, folder_name):
-        parent = folder_paths.input_directory if folder_parent == "folder_parent" else folder_paths.output_directory
+        parent = folder_paths.input_directory if folder_parent == "input folder" else folder_paths.output_directory
         directory = os.path.join(parent, folder_name)
         return (directory,)
     
