@@ -24,7 +24,10 @@ NODE_CLASS_MAPPINGS = {
     "IG String":            IG_String,
     "IG Path Join":         IG_PathJoin,
     "IG Cross Fade Images": IG_CrossFadeImages,
-    "IG ZFill":             IG_ZFill
+    "IG Interpolate":       IG_Interpolate,
+    "IG ZFill":             IG_ZFill,
+    "IG String List":       IG_StringList,
+    "IG Float List":        IG_FloatList,
 }
 
 NODE_DISPLAY_NAME_MAPPINGS = {
@@ -39,5 +42,8 @@ NODE_DISPLAY_NAME_MAPPINGS = {
     "IG String":            "➡️ IG String",
     "IG Path Join":         "📂 IG Path Join",
     "IG Cross Fade Images": "🧑🏻‍🧑🏿‍🧒🏽 IG Cross Fade Images",
-    "IG ZFill":             "⌨️IG ZFill",
+    "IG Interpolate":       "🧑🏻‍🧑🏿‍🧒🏽 IG Interpolate",
+    "IG ZFill":             "⌨️ IG ZFill",
+    "IG String List":       "📃 IG String List",
+    "IG Float List":        "📃 IG Float List",
 }
