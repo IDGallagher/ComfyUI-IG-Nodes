@@ -6,9 +6,12 @@ import math
 import json
 
 import sys
+from comfy import model_management
 import folder_paths
 from ..common.tree import *
 from ..common.constants import *
+from ..motion_predictor import MotionPredictor
+import comfy.utils
 
 def crossfade(images_1, images_2, alpha):
     crossfade = (1 - alpha) * images_1 + alpha * images_2
@@ -42,6 +45,99 @@ easing_functions = {
     "exponential_ease_out": exponential_ease_out,
 }
 
+def tensor_to_size(source, dest_size):
+    if isinstance(dest_size, torch.Tensor):
+        dest_size = dest_size.shape[0]
+    source_size = source.shape[0]
+
+    if source_size < dest_size:
+        shape = [dest_size - source_size] + [1]*(source.dim()-1)
+        source = torch.cat((source, source[-1:].repeat(shape)), dim=0)
+    elif source_size > dest_size:
+        source = source[:dest_size]
+
+    return source
+
+class IG_MotionPredictor:
+    @classmethod
+    def INPUT_TYPES(s):
+        return {
+            "required": {
+                "pos_embeds": ("PROJ_EMBEDS",),
+                "neg_embeds": ("PROJ_EMBEDS",),
+                "transitioning_frames": ("INT", {"default": 16,"min": 0, "max": 4096, "step": 1}),
+                "repeat_count": ("INT", {"default": 1, "min": 1, "max": 4096, "step": 1}),
+                "mode": (["motion_predict", "interpolate_linear"], ),
+                "motion_predictor_file": (folder_paths.get_filename_list("ipadapter"),),
+            }, 
+            "optional": {
+                "positive_prompts": ("STRING", {"default": [], "forceInput": True}),
+                "negative_prompts": ("STRING", {"default": [], "forceInput": True}),
+            }
+        }
+
+    RETURN_TYPES = ("PROJ_EMBEDS", "PROJ_EMBEDS", "STRING", "STRING", "INT",)
+    RETURN_NAMES = ("pos_embeds", "neg_embeds", "positive_string", "negative_string", "BATCH_SIZE", )
+    FUNCTION = "main"
+    CATEGORY = TREE_INTERP 
+
+    @torch.inference_mode()
+    def main(self, pos_embeds, neg_embeds, transitioning_frames, repeat_count, mode, motion_predictor_file, positive_prompts=None, negative_prompts=None):
+        
+        torch_device = model_management.get_torch_device()
+        dtype = model_management.unet_dtype()
+    
+        easing_function = easing_functions["linear"]
+        
+        print( f"Embed shape {pos_embeds.shape}")
+        
+        inbetween_embeds = []
+        # Make sure we have 2 images
+        if len(pos_embeds) > 1:
+            if mode == "motion_predict":
+                motion_predictor = MotionPredictor(total_frames=transitioning_frames).to(torch_device, dtype=dtype)
+                motion_predictor_path = folder_paths.get_full_path("ipadapter", motion_predictor_file)
+                checkpoint = comfy.utils.load_torch_file(motion_predictor_path, safe_load=True)
+                motion_predictor.load_state_dict(checkpoint)
+                for i in range(len(pos_embeds) - 1):
+                    embed1 = pos_embeds[i]
+                    embed2 = pos_embeds[i + 1]
+                    embed1 = embed1.unsqueeze(0)
+                    embed2 = embed2.unsqueeze(0)
+                    inbetween_embeds = motion_predictor(embed1, embed2).squeeze(0)
+            elif mode == "interpolate_linear":
+                # Interpolate embeds
+                for i in range(len(pos_embeds) - 1):
+                    embed1 = pos_embeds[i]
+                    embed2 = pos_embeds[i + 1]
+                    alphas = torch.linspace(0, 1, transitioning_frames)
+                    for alpha in alphas:
+                        eased_alpha = easing_function(alpha.item())
+                        print(f"eased alpha {eased_alpha}")
+                        inbetween_embed = (1 - eased_alpha) * embed1 + eased_alpha * embed2
+                        inbetween_embeds.extend([inbetween_embed])
+                        
+            inbetween_embeds = [embed for embed in inbetween_embeds for _ in range(repeat_count)]
+            # Find size of batch
+            batch_size = len(inbetween_embeds)
+
+        inbetween_embeds = torch.stack(inbetween_embeds, dim=0)
+
+        # ensure that cond and uncond have the same batch size
+        neg_embeds = tensor_to_size(neg_embeds, inbetween_embeds.shape[0])
+
+        # Combine and format prompt strings
+        def format_text_prompts(text_prompts):
+            string = ""
+            for i, prompt in enumerate(text_prompts):
+                string += f"\"{i * transitioning_frames * repeat_count - 1}\":\"{prompt}\",\n"
+            return string
+        
+        positive_string = format_text_prompts(positive_prompts) if positive_prompts is not None and len(positive_prompts) > 0 else "\"0\":\"\",\n"
+        negative_string = format_text_prompts(negative_prompts) if negative_prompts is not None and len(negative_prompts) > 0 else "\"0\":\"\",\n"
+        
+        return (inbetween_embeds, neg_embeds, positive_string, negative_string, batch_size,)
+
 class IG_Interpolate:
     @classmethod
     def INPUT_TYPES(s):
@@ -68,6 +164,7 @@ class IG_Interpolate:
     FUNCTION = "main"
     CATEGORY = TREE_INTERP 
 
+    @torch.inference_mode()
     def main(self, ipadapter, clip_vision, transitioning_frames, repeat_count, interpolation, buffer, input_images1=None, input_images2=None, input_images3=None, positive_prompts=None, negative_prompts=None):
         if 'ipadapter' in ipadapter:
             ipadapter_model = ipadapter['ipadapter']['model']
@@ -89,12 +186,16 @@ class IG_Interpolate:
                 continue
             # Create pos embeds
             img_cond_embeds = clip_vision.encode_image(input_images)
-            
+            print( f"penultimate_hidden_states shape {img_cond_embeds.penultimate_hidden_states.shape}")
+            print( f"last_hidden_state shape {img_cond_embeds.last_hidden_state.shape}")
+            print( f"image_embeds shape {img_cond_embeds.image_embeds.shape}")
+
             if is_plus:
                 img_cond_embeds = img_cond_embeds.penultimate_hidden_states
             else:
                 img_cond_embeds = img_cond_embeds.image_embeds
             print( f"Embed shape {img_cond_embeds.shape}")
+            
             inbetween_embeds = []
             # Make sure we have 2 images
             if len(img_cond_embeds) > 1:
@@ -187,65 +288,4 @@ class IG_CrossFadeImages:
         # crossfade_images.append(last_image)
 
         crossfade_images = torch.stack(crossfade_images, dim=0)
-    
-        # If not at end, transition image
-            
-
-        # for i in range(transitioning_frames):
-        #     alpha = alphas[i]
-        #     image1 = images_1[i + transition_start_index]
-        #     image2 = images_2[i + transition_start_index]
-        #     easing_function = easing_functions.get(interpolation)
-        #     alpha = easing_function(alpha)  # Apply the easing function to the alpha value
-
-        #     crossfade_image = crossfade(image1, image2, alpha)
-        #     crossfade_images.append(crossfade_image)
-            
-        # # Convert crossfade_images to tensor
-        # crossfade_images = torch.stack(crossfade_images, dim=0)
-        # # Get the last frame result of the interpolation
-        # last_frame = crossfade_images[-1]
-        # # Calculate the number of remaining frames from images_2
-        # remaining_frames = len(images_2) - (transition_start_index + transitioning_frames)
-        # # Crossfade the remaining frames with the last used alpha value
-        # for i in range(remaining_frames):
-        #     alpha = alphas[-1]
-        #     image1 = images_1[i + transition_start_index + transitioning_frames]
-        #     image2 = images_2[i + transition_start_index + transitioning_frames]
-        #     easing_function = easing_functions.get(interpolation)
-        #     alpha = easing_function(alpha)  # Apply the easing function to the alpha value
-
-        #     crossfade_image = crossfade(image1, image2, alpha)
-        #     crossfade_images = torch.cat([crossfade_images, crossfade_image.unsqueeze(0)], dim=0)
-        # # Append the beginning of images_1
-        # beginning_images_1 = images_1[:transition_start_index]
-        # crossfade_images = torch.cat([beginning_images_1, crossfade_images], dim=0)
         return (crossfade_images, )
-    
-
-# class IG_ParseqToWeights:
-
-#     FUNCTION = "main"
-#     CATEGORY = TREE_INTERP
-#     RETURN_TYPES = ("FLOAT",)
-#     RETURN_NAMES = ("weights",)
-
-#     @classmethod
-#     def INPUT_TYPES(s):
-#         return {
-#             "required": {
-#                 "parseq": ("STRING", {"default": '', "multiline": True}),
-#             },
-#         } 
-
-#     def main(self, parseq):
-#         # Load the JSON string into a dictionary
-#         data = json.loads(parseq)
-
-#         # Extract the list of frames
-#         frames = data.get('rendered_frames', [])
-
-#         # Extract the prompt_weight_1 from each frame and store it in a list
-#         prompt_weights = [frame['prompt_weight_1'] for frame in frames]
-
-#         return (prompt_weights, )
