@@ -1,7 +1,7 @@
 [project]
 name = "comfyui-ig-nodes"
 description = "Custom nodes to aid in the exploration of Latent Space"
-version = "1.0.0"
+version = "1.0.1"
 license = "LICENSE"
 
 [project.urls]
