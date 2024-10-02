@@ -11,6 +11,7 @@ from .nodes.io import *
 from .nodes.analyze import *
 from .nodes.primitives import *
 from .nodes.interpolate import *
+from .nodes.sm import *
 
 NODE_CLASS_MAPPINGS = {
     "IG Multiply":          IG_MultiplyNode,   
@@ -29,6 +30,8 @@ NODE_CLASS_MAPPINGS = {
     "IG ZFill":             IG_ZFill,
     "IG String List":       IG_StringList,
     "IG Float List":        IG_FloatList,
+    "SM Video Base":        SM_VideoBase,
+    "SM Video Base Control": SM_VideoBaseControl,
 }
 
 NODE_DISPLAY_NAME_MAPPINGS = {
@@ -48,4 +51,6 @@ NODE_DISPLAY_NAME_MAPPINGS = {
     "IG ZFill":             "⌨️ IG ZFill",
     "IG String List":       "📃 IG String List",
     "IG Float List":        "📃 IG Float List",
+    "SM Video Base":        "🎞️ SM Video Base",
+    "SM Video Base Control": "🎞️ SM Video Base Control", 
 }
