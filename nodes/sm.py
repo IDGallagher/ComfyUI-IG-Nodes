@@ -46,6 +46,7 @@ class SM_VideoBase:
                 "base_latents": ("LATENT",),
                 "vae": ("VAE", ),
                 "video_control": ("STRING", {"default": "", "multiline": True, "forceInput": True}),
+                "overall_video_weight": ("FLOAT", {"default": 1.0}),
                 "base_weight": ("FLOAT", {"default": 1.0}),
             }, 
             "optional": {
@@ -69,7 +70,7 @@ class SM_VideoBase:
     CATEGORY = TREE_SM
 
     @torch.inference_mode()
-    def main(self, base_latents, vae, video_control, base_weight=1.0, 
+    def main(self, base_latents, vae, video_control, overall_video_weight=1.0, base_weight=1.0, 
              video_frames_1=None, video_frames_2=None, video_frames_3=None, 
              video_frames_4=None, video_frames_5=None, video_frames_6=None, 
              video_frames_7=None, video_frames_8=None, video_frames_9=None, 
@@ -314,6 +315,7 @@ class SM_VideoBase:
             else:
                 print(f"[DEBUG] Phase 3 skipped for video_control line {vid_idx+1}")
 
+            weights = weights * overall_video_weight
             # Reshape weights for broadcasting
             weights = weights.view(-1, 1, 1, 1)  # Shape: (num_applicable_frames, 1, 1, 1)
             print(f"[DEBUG] Computed weights shape: {weights.shape}")
@@ -484,7 +486,7 @@ class SM_VideoBaseControl:
     CATEGORY = TREE_SM
 
     @torch.inference_mode()
-    def main(self, base_steps=0, video_control=""):
+    def main(self, base_steps=0, overall_weight=1.0, video_control=""):
         video_lengths = [0] * 10  # Initialize all video lengths to 0
         lines = video_control.strip().split('\n')
         
