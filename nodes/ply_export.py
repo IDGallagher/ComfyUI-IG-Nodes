@@ -7,17 +7,23 @@ from ..common.tree import *        # TREE_IO
 
 class IG_SavePLYPointCloud:
     """
-    Write a point-cloud tensor [N,6] = (x,y,z,r,g,b) to a binary-little-endian
-    .ply file.  Returns the file path for downstream use.
+    Save a point-cloud tensor [N, 6] → (x, y, z, r, g, b) to disk.
+
+    Supported formats
+    -----------------
+    • *ply_binary* – binary little-endian PLY (previous behaviour)  
+    • *xyz_ascii*  – plain-text XYZRGB: one line per point  
+                     "x y z r g b" (floats then ints)
 
     Inputs
     ------
-    pointcloud : POINTCLOUD – torch.float32 / float64 [N,6]
-    filename   : STRING      – optional.  If empty → auto-generate.
+    pointcloud      : POINTCLOUD   – torch float/uint8 [N,6]
+    filename_prefix : STRING       – optional; auto-generated if empty
+    export_format   : ["ply_binary", "xyz_ascii"]
 
     Output
     ------
-    ply_path   : STRING      – path to the written file
+    file_path       : STRING       – full path of the saved file
     """
 
     @classmethod
@@ -26,75 +32,97 @@ class IG_SavePLYPointCloud:
             "required": {
                 "pointcloud": ("POINTCLOUD",),
                 "filename_prefix": ("STRING", {"default": ""}),
+                "export_format": (["ply_binary", "xyz_ascii"],),
             },
         }
 
     RETURN_TYPES = ("STRING",)
-    RETURN_NAMES = ("ply_path",)
+    RETURN_NAMES = ("file_path",)
     FUNCTION = "main"
-    CATEGORY = TREE_IO  # 🐓 IG Nodes/IO
+    CATEGORY = TREE_IO  # 🐓 IG Nodes / IO
 
-    def main(self, pointcloud: torch.Tensor, filename_prefix: str):
+    def main(self, pointcloud: torch.Tensor, filename_prefix: str,
+             export_format: str):
+
         if pointcloud.dim() != 2 or pointcloud.shape[1] != 6:
             raise ValueError("pointcloud must be [N,6] (x,y,z,r,g,b).")
 
-        pc_np = pointcloud.cpu().numpy()
-        xyz = pc_np[:, :3].astype("<f4")       # little-endian float32
-        rgb = pc_np[:, 3:].astype(np.uint8)    # 0-255
-
-        N = pc_np.shape[0]
-
         # ------------------------------------------------------------------ #
-        #  Build header                                                      #
-        # ------------------------------------------------------------------ #
-        header = [
-            "ply",
-            "format binary_little_endian 1.0",
-            f"element vertex {N}",
-            "property float x",
-            "property float y",
-            "property float z",
-            "property uchar red",
-            "property uchar green",
-            "property uchar blue",
-            "end_header\n",
-        ]
-        header_bytes = ("\n".join(header)).encode("ascii")
-
-        # ------------------------------------------------------------------ #
-        #  Data block                                                        #
-        # ------------------------------------------------------------------ #
-        vertex_dtype = np.dtype(
-            [("x", "<f4"), ("y", "<f4"), ("z", "<f4"),
-             ("red", "u1"), ("green", "u1"), ("blue", "u1")]
-        )
-        vertices = np.empty(N, dtype=vertex_dtype)
-        vertices["x"] = xyz[:, 0]
-        vertices["y"] = xyz[:, 1]
-        vertices["z"] = xyz[:, 2]
-        vertices["red"] = rgb[:, 0]
-        vertices["green"] = rgb[:, 1]
-        vertices["blue"] = rgb[:, 2]
-
-        # ------------------------------------------------------------------ #
-        #  Output path                                                       #
+        #  Output filename / folder                                          #
         # ------------------------------------------------------------------ #
         if not filename_prefix:
             ts = datetime.now().strftime("%Y%m%d_%H%M%S")
             filename_prefix = f"pointcloud_{ts}"
 
-        if filename_prefix.endswith(".ply"):
-            filename_prefix = filename_prefix.split(".ply")[0]
+        (full_output_folder, filename, counter, _sub, _prefix
+         ) = folder_paths.get_save_image_path(
+            filename_prefix,
+            folder_paths.get_output_directory())
 
-        full_output_folder, filename, counter, subfolder, filename_prefix = folder_paths.get_save_image_path(filename_prefix, folder_paths.get_output_directory())
+        if export_format == "xyz_ascii":
+            file = f"{filename}_{counter:05}_.xyz"
+            file_path = os.path.join(full_output_folder, file)
+            self._save_xyz_ascii(pointcloud, file_path)
+            print(f"Saving XYZ file to {file_path}")
+            return (file_path,)
 
+        # ---------- default PLY-binary path ----------
         file = f"{filename}_{counter:05}_.ply"
-        ply_path = os.path.join(full_output_folder, file)
+        file_path = os.path.join(full_output_folder, file)
+        self._save_ply_binary(pointcloud, file_path)
+        print(f"Saving PLY file to {file_path}")
+        return (file_path,)
 
-        print(f"Saving PLY file to {ply_path}")
+    # ------------------------------------------------------------------ #
+    #  Helpers                                                            #
+    # ------------------------------------------------------------------ #
+    @staticmethod
+    def _save_xyz_ascii(pc: torch.Tensor, path: str):
+        """
+        Write plain ASCII:
+            x y z r g b\n
+        with RGB as 0-255 integers.
+        """
+        pc_np = pc.cpu().numpy()
+        xyz = pc_np[:, :3]
+        rgb = np.clip(pc_np[:, 3:], 0, 255).astype(np.uint8)
 
-        with open(ply_path, "wb") as f:
-            f.write(header_bytes)
-            vertices.tofile(f)
+        with open(path, "w", encoding="utf-8") as f:
+            for (x, y, z), (r, g, b) in zip(xyz, rgb):
+                f.write(f"{x:.6f} {y:.6f} {z:.6f} {int(r)} {int(g)} {int(b)}\n")
 
-        return (ply_path,) 
+    @staticmethod
+    def _save_ply_binary(pc: torch.Tensor, path: str):
+        """
+        Original binary-little-endian PLY writer (unchanged from prior
+        implementation).
+        """
+        pc_np = pc.cpu().numpy()
+        xyz = pc_np[:, :3].astype("<f4")
+        rgb = np.clip(pc_np[:, 3:], 0, 255).astype(np.uint8)
+
+        N = pc_np.shape[0]
+        header = (
+            "ply\n"
+            "format binary_little_endian 1.0\n"
+            f"element vertex {N}\n"
+            "property float x\n"
+            "property float y\n"
+            "property float z\n"
+            "property uchar red\n"
+            "property uchar green\n"
+            "property uchar blue\n"
+            "end_header\n"
+        ).encode("ascii")
+
+        vertex_dtype = np.dtype([
+            ("x", "<f4"), ("y", "<f4"), ("z", "<f4"),
+            ("red", "u1"), ("green", "u1"), ("blue", "u1")
+        ])
+        vertices = np.empty(N, dtype=vertex_dtype)
+        vertices["x"], vertices["y"], vertices["z"] = xyz.T
+        vertices["red"], vertices["green"], vertices["blue"] = rgb.T
+
+        with open(path, "wb") as f:
+            f.write(header)
+            vertices.tofile(f) 

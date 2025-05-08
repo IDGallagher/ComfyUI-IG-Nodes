@@ -17,6 +17,8 @@ from .nodes.stitch_depth import *
 from .nodes.pointcloud_from_depth import *
 from .nodes.ply_export import *
 from .nodes.pointcloud_cylindrical import *
+from .nodes.auto_stitch_rgb_tiles import *
+from .nodes.auto_stitch_rgb_tiles_any import *
 
 NODE_CLASS_MAPPINGS = {
     "IG Multiply":          IG_MultiplyNode,   
@@ -42,6 +44,8 @@ NODE_CLASS_MAPPINGS = {
     "IG PointCloud From Depth": IG_PointCloudFromDepth,
     "IG Save PLY PointCloud":   IG_SavePLYPointCloud,
     "IG PointCloud From Cylindrical": IG_PointCloudCylindricalFromDepth,
+    "IG Auto Stitch RGB Tiles": IG_AutoStitchRGBTiles,
+    "IG Auto Stitch RGB Tiles Any": IG_AutoStitchRGBTilesAny,
 }
 
 NODE_DISPLAY_NAME_MAPPINGS = {
@@ -68,4 +72,6 @@ NODE_DISPLAY_NAME_MAPPINGS = {
     "IG PointCloud From Depth": "🌐 IG PointCloud From Depth",
     "IG Save PLY PointCloud":   "💾 IG Save PLY PointCloud",
     "IG PointCloud From Cylindrical": "🌐 IG PointCloud From Cylindrical",
+    "IG Auto Stitch RGB Tiles": "🧩 IG Auto Stitch RGB Tiles",
+    "IG Auto Stitch RGB Tiles Any": "🧩 IG Auto Stitch RGB Tiles (Any)",
 }
