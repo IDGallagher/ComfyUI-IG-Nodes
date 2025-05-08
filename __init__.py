@@ -12,6 +12,11 @@ from .nodes.analyze import *
 from .nodes.primitives import *
 from .nodes.interpolate import *
 from .nodes.sm import *
+from .nodes.tile import *
+from .nodes.stitch_depth import *
+from .nodes.pointcloud_from_depth import *
+from .nodes.ply_export import *
+from .nodes.pointcloud_cylindrical import *
 
 NODE_CLASS_MAPPINGS = {
     "IG Multiply":          IG_MultiplyNode,   
@@ -32,6 +37,11 @@ NODE_CLASS_MAPPINGS = {
     "IG Float List":        IG_FloatList,
     "SM Video Base":        SM_VideoBase,
     "SM Video Base Control": SM_VideoBaseControl,
+    "IG Tile Image":        IG_TileImage,
+    "IG Stitch Depth Tiles": IG_StitchDepthTiles,
+    "IG PointCloud From Depth": IG_PointCloudFromDepth,
+    "IG Save PLY PointCloud":   IG_SavePLYPointCloud,
+    "IG PointCloud From Cylindrical": IG_PointCloudCylindricalFromDepth,
 }
 
 NODE_DISPLAY_NAME_MAPPINGS = {
@@ -52,5 +62,10 @@ NODE_DISPLAY_NAME_MAPPINGS = {
     "IG String List":       "📃 IG String List",
     "IG Float List":        "📃 IG Float List",
     "SM Video Base":        "🎞️ SM Video Base",
-    "SM Video Base Control": "🎞️ SM Video Base Control", 
+    "SM Video Base Control": "🎞️ SM Video Base Control",
+    "IG Tile Image":        "🧩 IG Tile Image",
+    "IG Stitch Depth Tiles": "🧩 IG Stitch Depth Tiles",
+    "IG PointCloud From Depth": "🌐 IG PointCloud From Depth",
+    "IG Save PLY PointCloud":   "💾 IG Save PLY PointCloud",
+    "IG PointCloud From Cylindrical": "🌐 IG PointCloud From Cylindrical",
 }

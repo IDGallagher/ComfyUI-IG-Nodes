@@ -1,0 +1,107 @@
+########################################
+# Unreal Engine 5: Generated Folders
+########################################
+# Build artifacts and auto-generated intermediate files.
+*/Binaries/
+*/DerivedDataCache/
+*/Intermediate/
+*/Saved/
+*.opensdf
+*.opensdf.*
+*.VC.db
+*.VC.opendb
+
+# For Unreal Build System
+.vs/
+*.sln
+*.suo
+*.xcodeproj
+*.xcworkspace
+*.code-workspace
+*/__ExternalActors__/
+*/__ExternalObjects__/
+
+# If you use Rider, ignore Rider-specific project files
+.idea/
+*.iml
+
+########################################
+# C++ Specific
+########################################
+# Ignore object files, archives, executables, and debug symbols
+*.obj
+*.o
+*.lo
+*.loT
+*.ko
+*.ilk
+*.ncb
+*.sdf
+*.pdb
+*.idb
+*.class
+*.dyn
+*.out
+*.o.d
+*.dSYM/
+
+# Ignore static & shared libraries
+*.lib
+*.a
+*.la
+*.lo
+*.dll
+*.dylib
+*.so
+
+########################################
+# OS-Specific
+########################################
+# Windows
+Thumbs.db
+Desktop.ini
+
+# macOS
+.DS_Store
+.AppleDouble
+.LSOverride
+
+# Linux
+*~
+.nfs*
+
+########################################
+# Optional: Plugins
+########################################
+# If you use external plugins, you might want to ignore their build artifacts as well
+# (If you don’t want to keep plugin Binaries/Intermediate in version control)
+Plugins/*/Binaries/
+Plugins/*/Intermediate/
+
+########################################
+# Other
+########################################
+# Ignore any compiled shader caches
+*.shadercache
+*.ushaderbytecode
+*.upipelinecache
+*.uddc
+
+# Crash report client
+CrashReportClient/
+
+# Pak files (packaged content)
+*.pak
+*.sig
+*.pak.info.json
+
+# Optional: Ignore local config override files 
+# (If you want to keep machine-specific config out of source control)
+# Config/Default*.ini
+# !Config/DefaultEngine.ini
+# !Config/DefaultGame.ini
+# !Config/DefaultInput.ini
+# !Config/DefaultEditor.ini
+
+# Note: Typically, Default*.ini files are kept in the repo, but local overrides might be ignored.
+# If you have local-only .ini files, you can add them here.
