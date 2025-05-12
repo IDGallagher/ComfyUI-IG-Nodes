@@ -18,6 +18,8 @@ from .nodes.pointcloud_from_depth import *
 from .nodes.ply_export import *
 from .nodes.pointcloud_cylindrical import *
 from .nodes.stitcher_cv2 import *
+from .nodes.simple_translate_stitcher import *
+from .nodes.image_crop import *
 
 NODE_CLASS_MAPPINGS = {
     "IG Multiply":          IG_MultiplyNode,   
@@ -36,6 +38,7 @@ NODE_CLASS_MAPPINGS = {
     "IG ZFill":             IG_ZFill,
     "IG String List":       IG_StringList,
     "IG Float List":        IG_FloatList,
+    "IG Simple Translate Stitcher": IG_SimpleTranslateStitcher,
     "SM Video Base":        SM_VideoBase,
     "SM Video Base Control": SM_VideoBaseControl,
     "IG Tile Image":        IG_TileImage,
@@ -44,6 +47,7 @@ NODE_CLASS_MAPPINGS = {
     "IG Save PLY PointCloud":   IG_SavePLYPointCloud,
     "IG PointCloud From Cylindrical": IG_PointCloudCylindricalFromDepth,
     "IG Stitch Images CV2": IG_StitchImagesCV2,
+    "IG Image Crop": IG_ImageCrop,
 }
 
 NODE_DISPLAY_NAME_MAPPINGS = {
@@ -63,6 +67,7 @@ NODE_DISPLAY_NAME_MAPPINGS = {
     "IG ZFill":             "⌨️ IG ZFill",
     "IG String List":       "📃 IG String List",
     "IG Float List":        "📃 IG Float List",
+    "IG Simple Translate Stitcher": "🧩 IG Stitch Images (Simple)",
     "SM Video Base":        "🎞️ SM Video Base",
     "SM Video Base Control": "🎞️ SM Video Base Control",
     "IG Tile Image":        "🧩 IG Tile Image",
@@ -71,4 +76,5 @@ NODE_DISPLAY_NAME_MAPPINGS = {
     "IG Save PLY PointCloud":   "💾 IG Save PLY PointCloud",
     "IG PointCloud From Cylindrical": "🌐 IG PointCloud From Cylindrical",
     "IG Stitch Images CV2": "🧩 IG Stitch Images (CV2)",
+    "IG Image Crop": "✂️ IG Image Crop",
 }
