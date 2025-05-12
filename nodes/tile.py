@@ -1,26 +1,21 @@
+# v1.3 – fixed wrap-mode off-by-one causing mismatched tile widths (UE5.5)
+
 import math
 import torch
+from ..common.tree import *      # TREE_IO constant
 
-from ..common.tree import *  # brings in TREE_IO constant
 
 class IG_TileImage:
     """
-    Slice a wide image into fixed-width tiles (left-to-right) while guaranteeing
-    a minimum overlap between neighbouring tiles.
+    Slice a wide image into fixed-width tiles while guaranteeing a minimum
+    overlap between neighbours.
 
-    Inputs
-    ------
-    image : IMAGE           – ComfyUI tensor [B,H,W,C] or [H,W,C]
-    tile_width : INT        – Desired tile width in pixels.
-    min_overlap_width : INT – Minimum overlap (pixels) each tile must share
-                              with its neighbour.
-
-    Outputs
-    -------
-    tiles         : IMAGE – Batch of tiles ordered left→right.  Shape:
-                            [B*n_tiles, H, tile_width, C]
-    overlap_width : INT   – The actual overlap assigned (≥ min_overlap_width).
-    image_width   : INT   – Original width of the input image (pixels).
+    New parameters
+    --------------
+    wrap_horizontal : bool
+        When True the final tile wraps around the right edge so the first
+        and last tiles overlap, creating edge-consistent input for
+        cylindrical panoramas.
     """
 
     @classmethod
@@ -28,52 +23,63 @@ class IG_TileImage:
         return {
             "required": {
                 "image": ("IMAGE",),
-                "tile_width": ("INT", {"default": 512, "min": 1, "max": 99999999, "step": 1}),
-                "min_overlap_width": ("INT", {"default": 64, "min": 0, "max": 99999999, "step": 1}),
+                "tile_width":        ("INT", {"default": 512, "min": 1}),
+                "min_overlap_width": ("INT", {"default": 64,  "min": 0}),
+                "wrap_horizontal":   ("BOOLEAN", {"default": False}),
             },
         }
 
     RETURN_TYPES = ("IMAGE", "INT", "INT")
     RETURN_NAMES = ("tiles", "overlap_width", "image_width")
-    FUNCTION = "main"
-    CATEGORY = TREE_IO     # Appears in 🐓 IG Nodes/IO
+    FUNCTION     = "main"
+    CATEGORY     = TREE_IO
 
-    def main(self, image, tile_width: int, min_overlap_width: int):
-        # Accept either [H,W,C] or [B,H,W,C]
-        if image.dim() == 3:         # single image, no batch dim
+    # ------------------------------------------------------------------ #
+    #  main                                                              #
+    # ------------------------------------------------------------------ #
+    def main(
+        self,
+        image: torch.Tensor,
+        tile_width: int,
+        min_overlap_width: int,
+        wrap_horizontal: bool = False,
+    ):
+        # ---------- normalise rank ----------------------------------------
+        if image.dim() == 3:
             image = image.unsqueeze(0)
         elif image.dim() != 4:
-            raise ValueError("IMAGE tensor must have 3 or 4 dimensions (B,H,W,C).")
-
+            raise ValueError("IMAGE tensor must be [B,H,W,C] or [H,W,C].")
         B, H, W, C = image.shape
 
-        # If the image already fits in one tile, return it unchanged
+        # ---------- trivial case ------------------------------------------
         if W <= tile_width:
-            return (image, 0, W)
+            return (image, 0, W)                # no tiling needed
 
-        # Determine smallest stride that still meets the minimum overlap
-        min_stride = max(1, tile_width - min_overlap_width)
+        stride         = max(1, tile_width - min_overlap_width)
+        overlap_width  = tile_width - stride
+        tiles          = []
 
-        # Calculate number of tiles required
-        n_tiles = math.ceil((W - tile_width) / min_stride) + 1
+        # ---------- number of tiles ---------------------------------------
+        if wrap_horizontal:
+            n_tiles = math.ceil(W / stride)     # ensures last start < W
+        else:
+            n_tiles = math.ceil((W - tile_width) / stride) + 1
 
-        # Compute the real overlap so that tiles exactly span the width
-        overlap_width = 0
-        if n_tiles > 1:
-            overlap_width = int(round((n_tiles * tile_width - W) / (n_tiles - 1)))
-
-        stride = tile_width - overlap_width
-
-        # Extract tiles
-        tiles = []
-        for t in range(n_tiles):
-            start = t * stride
+        # ---------- extract tiles -----------------------------------------
+        for i in range(n_tiles):
+            start = i * stride
             end   = start + tile_width
-            if end > W:                # final tile: clamp to the right edge
-                start = W - tile_width
-                end   = W
-            tile = image[:, :, start:end, :]   # keep original batch dim
+
+            if end <= W:
+                tile = image[:, :, start:end, :]
+            elif wrap_horizontal:               # split across boundary
+                part1 = image[:, :, start:W, :]
+                part2 = image[:, :, 0:end - W, :]
+                tile  = torch.cat([part1, part2], dim=2)
+            else:                               # clamp final non-wrap tile
+                tile = image[:, :, W - tile_width:W, :]
+
             tiles.append(tile)
 
-        tiles = torch.cat(tiles, dim=0)        # stack along batch dimension
-        return (tiles, overlap_width, W) 
+        tiles = torch.cat(tiles, dim=0)         # stack on batch dimension
+        return (tiles, overlap_width, W)
