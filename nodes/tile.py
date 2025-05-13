@@ -1,22 +1,29 @@
-# v1.3 – fixed wrap-mode off-by-one causing mismatched tile widths (UE5.5)
+# v1.6 – simpler wrap logic: constant stride, deterministic tiles,
+#        hard-cap on tile count to prevent OOM (UE5.5)
 
 import math
 import torch
-from ..common.tree import *      # TREE_IO constant
+from ..common.tree import *          # TREE_IO constant
 
 
 class IG_TileImage:
     """
-    Slice a wide image into fixed-width tiles while guaranteeing a minimum
-    overlap between neighbours.
+    Slice a wide image into fixed-width tiles.
 
-    New parameters
-    --------------
-    wrap_horizontal : bool
-        When True the final tile wraps around the right edge so the first
-        and last tiles overlap, creating edge-consistent input for
-        cylindrical panoramas.
+    *wrap_horizontal=False* → classic sliding-window tiling with a
+    uniform overlap.
+
+    *wrap_horizontal=True*  → windows slide past the right edge and wrap
+    from x=0; the final (wrapped) tile may have a **larger** overlap than
+    its neighbours.  That is fine so long as every tile is extracted by
+    the *same* deterministic rule, because any stage that needs the exact
+    overlap can recompute it from (i, stride, tile_width, image_width).
+
+    The node refuses to generate more than MAX_TILES to avoid runaway
+    memory use; choose wider tiles or a larger overlap if that happens.
     """
+
+    MAX_TILES = 2048                  # guardrail against OOM
 
     @classmethod
     def INPUT_TYPES(cls):
@@ -29,10 +36,10 @@ class IG_TileImage:
             },
         }
 
-    RETURN_TYPES = ("IMAGE", "INT", "INT")
-    RETURN_NAMES = ("tiles", "overlap_width", "image_width")
-    FUNCTION     = "main"
-    CATEGORY     = TREE_IO
+    RETURN_TYPES  = ("IMAGE", "INT", "INT")
+    RETURN_NAMES  = ("tiles", "overlap_width", "image_width")
+    FUNCTION      = "main"
+    CATEGORY      = TREE_IO
 
     # ------------------------------------------------------------------ #
     #  main                                                              #
@@ -44,42 +51,59 @@ class IG_TileImage:
         min_overlap_width: int,
         wrap_horizontal: bool = False,
     ):
-        # ---------- normalise rank ----------------------------------------
+        # -------- ensure rank 4 -------------------------------------------
         if image.dim() == 3:
             image = image.unsqueeze(0)
         elif image.dim() != 4:
-            raise ValueError("IMAGE tensor must be [B,H,W,C] or [H,W,C].")
+            raise ValueError("IMAGE must be [B,H,W,C] or [H,W,C].")
+
         B, H, W, C = image.shape
+        if W <= tile_width:                           # one-tile shortcut
+            return (image, 0, W)
 
-        # ---------- trivial case ------------------------------------------
-        if W <= tile_width:
-            return (image, 0, W)                # no tiling needed
+        # -------- stride & overlap (constant) -----------------------------
+        stride = max(1, tile_width - min_overlap_width)
+        overlap_width = tile_width - stride
 
-        stride         = max(1, tile_width - min_overlap_width)
-        overlap_width  = tile_width - stride
-        tiles          = []
-
-        # ---------- number of tiles ---------------------------------------
         if wrap_horizontal:
-            n_tiles = math.ceil(W / stride)     # ensures last start < W
+            n_tiles = math.ceil(W / stride)
         else:
             n_tiles = math.ceil((W - tile_width) / stride) + 1
 
-        # ---------- extract tiles -----------------------------------------
+        if n_tiles > self.MAX_TILES:
+            raise ValueError(
+                f"Tiling would create {n_tiles} tiles (> {self.MAX_TILES}). "
+                f"Increase 'tile_width', increase 'min_overlap_width', "
+                f"or resize the image."
+            )
+
+        # -------- extract tiles -------------------------------------------
+        tiles = []
         for i in range(n_tiles):
-            start = i * stride
+            start = (i * stride) % W
             end   = start + tile_width
+            
+            print(f"Tile {i+1}/{n_tiles}:")
+            print(f"  start: {start}")
+            print(f"  end: {end}")
+            print(f"  stride: {stride}")
+            print(f"  tile_width: {tile_width}")
 
             if end <= W:
+                print(f"  Taking slice [{start}:{end}]")
                 tile = image[:, :, start:end, :]
-            elif wrap_horizontal:               # split across boundary
-                part1 = image[:, :, start:W, :]
-                part2 = image[:, :, 0:end - W, :]
-                tile  = torch.cat([part1, part2], dim=2)
-            else:                               # clamp final non-wrap tile
-                tile = image[:, :, W - tile_width:W, :]
+            else:                                       # wrap split
+                print(f"  Wrapping around image width {W}")
+                right = image[:, :, start:W, :]
+                done = W-start
+                print(f"  Right portion: [{start}:{W}] ({done} pixels)")
+                left  = image[:, :, :tile_width-done, :]
+                print(f"  Left portion: [0:{tile_width-done}] ({tile_width-done} pixels)")
+                tile  = torch.cat([right, left], dim=2)
+                print(f"  Combined tile width: {tile.shape[2]}")
 
             tiles.append(tile)
 
-        tiles = torch.cat(tiles, dim=0)         # stack on batch dimension
+        tiles = torch.cat(tiles, dim=0)                 # [B×T, H, Wt, C]
+        print(f"\nFinal output shape: {tiles.shape}")
         return (tiles, overlap_width, W)
