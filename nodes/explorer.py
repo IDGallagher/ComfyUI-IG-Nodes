@@ -20,17 +20,20 @@ class IG_ExplorerNode:
         return {
             "required": {
                 "folder": ("STRING", {"forceInput": True}),
-                "precision": ("FLOAT", {"default": 0.0001, "min": FLOAT_STEP, "max": 1, "step": FLOAT_STEP})
+                "precision": ("FLOAT", {"default": 0.0001, "min": FLOAT_STEP, "max": 1, "step": FLOAT_STEP}),
+                "max_images": ("INT", {"default": 0, "min": 0, "step": 1}),
+                "num_explorations": ("INT", {"default": 0, "min": 0, "step": 1}),
+                "start_seed": ("INT", {"default": 0, "min": 0, "step": 1}),
             },
         }
     
     @classmethod
-    def IS_CHANGED(cls, folder: str, precision, **kwargs):
+    def IS_CHANGED(cls, folder: str, precision, max_images, num_explorations, start_seed, **kwargs):
         print(f"IS CHANGED")
         # return random.randint(1, 100000000000)
         return float("NaN")
 
-    RETURN_TYPES = ("FLOAT","STRING",)
+    RETURN_TYPES = ("FLOAT","STRING","INT",)
     FUNCTION = "main"
     CATEGORY = TREE_EXPLORER
 
@@ -55,10 +58,21 @@ class IG_ExplorerNode:
         print(f"Full file: {full_file}")
         return os.path.isfile(full_file)
     
+    def count_images(self):
+        return len([f for f in os.listdir(self.folder) if f.startswith("image_") and f.endswith("_00001_.png") and os.path.isfile(os.path.join(self.folder, f))])
+
+    def load_state(self, path, start_seed):
+        try:
+            with open(path, 'r') as f:
+                return json.load(f)
+        except (FileNotFoundError, json.JSONDecodeError):
+            return {'current_seed': start_seed, 'explorations_done': 0, 'active_subfolder': None}
+
+    def save_state(self, path, state):
+        with open(path, 'w') as f:
+            json.dump(state, f)
+
     def save_queue(self, queue, filename):
-        # Ensure directory exists
-        os.makedirs(os.path.dirname(filename), exist_ok=True)
-        
         # Use the .txt extension or any other preferred plaintext format
         filename = os.path.splitext(filename)[0] + '.txt'
 
@@ -106,22 +120,27 @@ class IG_ExplorerNode:
         print(f"{param1} {param2} - {ssim_value}")
         return ssim_value
 
-    def process_jobs(self, queue, precision):
+    def process_jobs(self, queue, precision, max_images, current_count):
         for job in queue:
             if job.difference is None:
-                # Generate images if not already done
                 if not self.image_exists(job.param1):
-                    return job.param1
+                    if max_images == 0 or current_count < max_images:
+                        return job.param1
+                    else:
+                        continue
                 if not self.image_exists(job.param2):
-                    return job.param2
-                # Measure and set the difference
+                    if max_images == 0 or current_count < max_images:
+                        return job.param2
+                    else:
+                        continue
                 job.difference = self.measure_difference(job.param1, job.param2)
 
-        # Filter jobs that have a difference greater than precision and have a measured difference
         eligible_jobs = [job for job in queue if job.difference is not None and abs(job.param1 - job.param2) > precision]
 
-        # If no eligible jobs are found, return -1
         if not eligible_jobs:
+            return -1
+
+        if max_images != 0 and current_count >= max_images:
             return -1
 
         # Find the job with the maximum difference
@@ -138,11 +157,30 @@ class IG_ExplorerNode:
         # Generate the new image
         return mid_param
 
-    def main(self, folder, precision):
-        self.folder = folder
-        queue_path = os.path.join(folder,'job_queue.json')
-        queue = self.load_queue(queue_path)
-        param = self.process_jobs(queue, precision)
-        self.save_queue(queue, queue_path)
-        assert param > -1, "🤖 Exploration finished!"
-        return (param, self.image_filename(param))
+    def main(self, folder, precision, max_images, num_explorations, start_seed):
+        os.makedirs(folder, exist_ok=True)
+        state_path = os.path.join(folder, 'exploration_state.json')
+        while True:
+            state = self.load_state(state_path, start_seed)
+            if state['active_subfolder'] is None:
+                if num_explorations > 0 and state['explorations_done'] >= num_explorations:
+                    raise AssertionError("🤖 All explorations finished!")
+                current_seed = state['current_seed']
+                subfolder = os.path.join(folder, f"seed_{current_seed}")
+                os.makedirs(subfolder, exist_ok=True)
+                state['active_subfolder'] = subfolder
+                state['current_seed'] = current_seed + 1
+                state['explorations_done'] += 1
+                self.save_state(state_path, state)
+            self.folder = state['active_subfolder']
+            queue_path = os.path.join(self.folder, 'job_queue.json')
+            queue = self.load_queue(queue_path)
+            current_count = self.count_images()
+            param = self.process_jobs(queue, precision, max_images, current_count)
+            self.save_queue(queue, queue_path)
+            if param > -1:
+                seed = int(os.path.basename(self.folder).split('_')[1])
+                return (param, self.image_filename(param), seed)
+            else:
+                state['active_subfolder'] = None
+                self.save_state(state_path, state)
